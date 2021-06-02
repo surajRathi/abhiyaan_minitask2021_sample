@@ -1,0 +1,8 @@
+<launch>
+    <arg name="name" default="mpc_turtle"/>
+    <node launch-prefix="$(find mpc_simple)/scripts/spawn_turtle.sh $(arg name)"
+          name="mpc_controller" pkg="mpc_simple" type="mpc_simple_node"
+          ns="turtlesim" output="screen">
+        <param name="turtle_name" value="$(arg name)"/>
+    </node>
+</launch>
