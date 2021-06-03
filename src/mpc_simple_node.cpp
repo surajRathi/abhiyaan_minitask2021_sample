@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Twist.h>
 #include <turtlesim/Pose.h>
+#include <mpc_simple/MPC.h>
 
 
 void save_pose(turtlesim::Pose &loc, const turtlesim::PoseConstPtr &pose) {
@@ -36,14 +37,44 @@ int main(int argc, char *argv[]) {
     ros::Duration(1.0).sleep(); // Lazy wait for first message
     ros::spinOnce();
 
+    // LOOK forward horizon
+    // a, alpha_dot
+    // get v, alpha, x, y for the next horizon_timesteps
+    // minimize delta y with the other vehicle
+    // dont collide
+    // maximize x
+
+    double dt = 0.5;
+    auto rate = ros::Rate(1.0 / dt);
+
+    mpc_simple::MPC mpc;
+
+    const auto L = 1.0;
+    // State
+    double v_rear = 0, alpha = 0;
+
     while (ros::ok()) {
         ROS_INFO("Running");
-        ROS_INFO("(%f, %f), %f ", env.self.x, env.self.y, env.other.x);
+        ROS_INFO("===> (%f, %f) ", v_rear, alpha);
 
-        vel.linear.x = 0.7 * (env.other.x - env.self.x - 1);
+        auto inputs = mpc.get_control_input(v_rear, alpha,
+                                            env.self.x, env.self.y, env.self.theta,
+                                            env.other.x, env.other.y, 10.0, 5.0);
+
+        ROS_INFO("===> (%f, %f) ", inputs.a, inputs.alpha_dot);
+
+        v_rear += dt * inputs.a;
+        alpha += dt * inputs.alpha_dot;
+
+        // Assume Rear wheel drive
+
+        vel.linear.x = v_rear;
+        vel.linear.y = v_rear * tan(alpha) / 2;
+        vel.angular.z = v_rear * tan(alpha) / L;
+
         vel_pub.publish(vel);
 
-        ros::Duration(1).sleep();
+        rate.sleep();
         ros::spinOnce();
     }
 }

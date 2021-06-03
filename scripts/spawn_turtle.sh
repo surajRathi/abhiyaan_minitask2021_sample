@@ -10,7 +10,7 @@ fi
 
 # rosservice call /turtlesim/kill "$1"
 rosservice call /turtlesim/reset
-rosservice call /turtlesim/spawn 0 5 0 "$1"
+rosservice call /turtlesim/spawn 0 5 0.3 "$1"
 shift
 
 exec "$@"
