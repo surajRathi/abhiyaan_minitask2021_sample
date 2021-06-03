@@ -1,6 +1,8 @@
 #include <mpc_simple/MPC.h>
+
 #include <cppad/ipopt/solve.hpp>
 #include <cppad/ipopt/solve_result.hpp>
+
 #include <ros/ros.h>
 
 
@@ -53,29 +55,18 @@ MPC::MPC(Params p_in) : p{p_in}, _vars{p.timesteps * 2},
     ipopt_options += "Numeric max_cpu_time          0.5\n";
 }
 
-MPC::ControlInputs MPC::get_control_input(
-        double v, double alpha_in,
-        double x_self, double y_self, double theta,
-        double x_other, double y_other,
-        double x_goal, double y_goal) {
+MPC::ControlInputs MPC::get_control_input(const State &s) {
+    state = s;
 
-    _v = v;
-    _al = alpha_in;
-    _x_s = x_self;
-    _y_s = y_self;
-    _theta = theta;
-    _x_o = x_other;
-    _y_o = y_other;
-    _x_g = x_goal;
-    _y_g = y_goal;
+    const auto start = std::chrono::high_resolution_clock::now();
 
     CppAD::ipopt::solve_result<Dvector> solution;
-    const auto start = std::chrono::high_resolution_clock::now();
     CppAD::ipopt::solve(ipopt_options, _vars, vars_b.low, vars_b.high, cons_b.low, cons_b.high, *this, solution);
+
     ROS_INFO("IPOPT %li ms.", std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::high_resolution_clock::now() - start).count());
-    
-    std::cout << ipopt_error_string.at(solution.status) << std::endl;
+
+    ROS_INFO("%s", ipopt_error_string.at(solution.status).c_str());
 
     return {solution.x[0], solution.x[0 + p.timesteps]};
 }
@@ -93,12 +84,14 @@ void MPC::operator()(MPC::ADvector &outputs, MPC::ADvector &vars) const {
     ConsWrapper cons{outputs};
     objective_func = 0;
 
-    ADvector::value_type x{_x_s}, y{_y_s}, theta{_theta}, v{_v}, al{_al};
+    // Replace with State<ADvector::value_type> ??
+    ADvector::value_type x{state.x_s}, y{state.y_s}, theta{state.theta}, v{state.v}, al{state.al};
+    const auto x_o = state.x_o, y_o = state.y_o, x_g = state.x_g, y_g = state.y_g;
 
     for (auto i = 0; i < p.timesteps; i++) {
         v += p.dt * vars[i];
         al += p.dt * vars[i + p.timesteps];
-        auto dx = v * p.dt;
+        auto dx = p.dt * v;
         auto dy = p.dt * v * CppAD::tan(al) / 2;
         auto c = CppAD::cos(theta), s = CppAD::sin(theta);
         x += c * dx - s * dy;
@@ -107,10 +100,11 @@ void MPC::operator()(MPC::ADvector &outputs, MPC::ADvector &vars) const {
 
         cons[i + 0 * p.timesteps] = v;
         cons[i + 1 * p.timesteps] = al;
-        cons[i + 2 * p.timesteps] = pow(x - _x_o, 2) + pow(y - _y_o, 2);
+        cons[i + 2 * p.timesteps] = CppAD::pow(x - x_o, 2) + CppAD::pow(y - y_o, 2);
 
-        objective_func +=
-                CppAD::pow(x - _x_g, 2) + CppAD::pow(y - _y_g, 2) + 1 / (pow(x - _x_o, 2) + pow(y - _y_o, 2));
+        objective_func += CppAD::pow(x - x_g, 2) + CppAD::pow(y - y_g, 2); // Goal
+        objective_func += 1.0 / (CppAD::pow(x - x_o, 2) + CppAD::pow(y - y_o, 2)); // Obstacle
+        objective_func += 10 * CppAD::abs(theta - CppAD::atan2(y_g - y, x_g - x));
     }
 
 

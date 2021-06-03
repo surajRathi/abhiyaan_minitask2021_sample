@@ -1,12 +1,6 @@
-//
-// Created by suraj on 6/2/21.
-//
-
 #ifndef MPC_SIMPLE_MPC_H
 #define MPC_SIMPLE_MPC_H
 
-
-#include <turtlesim/Pose.h>
 #include <cppad/cppad.hpp>
 
 namespace mpc_simple {
@@ -14,6 +8,7 @@ namespace mpc_simple {
     // using vector = std::vector<T>;
     // using vector = std::valarray<T>;
     using vector = CppAD::vector<T>;
+
     using Dvector = vector<double>;
 
 
@@ -30,14 +25,20 @@ namespace mpc_simple {
 
 
     struct Params {
-        size_t timesteps = 10;
+        size_t timesteps = 20;
         float dt = 0.1;
 
         LH<double> a{0.4}, v{1},
-                alpha_dot{0.1}, alpha{0.4};
+                alpha_dot{0.3}, alpha{0.7};
 
         double safe_dist = 1;
 
+    };
+
+    struct State {
+        double v{0}, al{0},
+                x_s{0}, y_s{0}, theta{0},
+                x_o{0}, y_o{0}, x_g{0}, y_g{0};
     };
 
     class MPC {
@@ -46,24 +47,23 @@ namespace mpc_simple {
     private:
         const Params p;
         std::string ipopt_options;
-        double _v{0}, _al{0}, _x_s{0}, _y_s{0}, _theta{0},
-                _x_o{0}, _y_o{0}, _x_g{0}, _y_g{0};
+
+        State state;
 
     public:
         explicit MPC(Params p_in = Params{});
 
+        // variables: {a0, a1, a2 ... a_timesteps, alpha_dot_0, alpha_dot_1 ... alpha_dot_timesteps}
+        // constraints: {v0... , alpha0... , dist_from_obstacle0... }
         Dvector _vars;
         LH<Dvector> vars_b, cons_b;
+
 
         struct ControlInputs {
             double a, alpha_dot;
         };
 
-        ControlInputs
-        get_control_input(double v, double alpha_in,
-                          double x_self, double y_self, double theta,
-                          double x_other, double y_other,
-                          double x_goal, double y_goal);
+        ControlInputs get_control_input(const State &s);
 
         void operator()(ADvector &outputs, ADvector &vars) const;
     };
