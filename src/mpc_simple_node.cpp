@@ -54,6 +54,15 @@ int main(int argc, char *argv[]) {
     double v_rear = 0, alpha = 0;
 
     while (ros::ok()) {
+        if ((pow(env.self.x - 10.0, 2) + pow(env.self.y - 5.0, 2)) < 1.0) {
+            ROS_INFO("Reached Goal!");
+            ROS_INFO("Shutting Down");
+            vel.linear.x = 0;
+            vel.linear.y = 0;
+            vel.angular.z = 0;
+            vel_pub.publish(vel);
+            break;
+        }
         ROS_INFO("Running");
         ROS_INFO("===> (%f, %f) ", v_rear, alpha);
 

@@ -1,6 +1,8 @@
 #include <mpc_simple/MPC.h>
 #include <cppad/ipopt/solve.hpp>
 #include <cppad/ipopt/solve_result.hpp>
+#include <ros/ros.h>
+
 
 using namespace mpc_simple;
 
@@ -68,21 +70,12 @@ MPC::ControlInputs MPC::get_control_input(
     _y_g = y_goal;
 
     CppAD::ipopt::solve_result<Dvector> solution;
-
-#include <iostream>
-#include <iomanip>
-
-//    std::cout << std::fixed;
-//    std::cout << std::setprecision(2);
-//    std::cout << v << " " << alpha_in << std::endl;
     const auto start = std::chrono::high_resolution_clock::now();
     CppAD::ipopt::solve(ipopt_options, _vars, vars_b.low, vars_b.high, cons_b.low, cons_b.high, *this, solution);
-//    std::cout << "IPOPT " << std::chrono::duration_cast<std::chrono::milliseconds>(
-//            std::chrono::high_resolution_clock::now() - start).count() << "ms." << std::endl;
-//    std::cout << solution.x << std::endl;
-//    std::cout << solution.g << std::endl;
-//    std::cout << solution.obj_value << std::endl;
-//    std::cout << ipopt_error_string.at(solution.status) << std::endl;
+    ROS_INFO("IPOPT %li ms.", std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - start).count());
+    
+    std::cout << ipopt_error_string.at(solution.status) << std::endl;
 
     return {solution.x[0], solution.x[0 + p.timesteps]};
 }
