@@ -4,10 +4,6 @@
 #include <mpc_simple/MPC.h>
 
 
-void save_pose(turtlesim::Pose &loc, const turtlesim::PoseConstPtr &pose) {
-    loc = *pose;
-}
-
 int main(int argc, char *argv[]) {
     ros::init(argc, argv, "turtle_controller");
 
@@ -21,14 +17,14 @@ int main(int argc, char *argv[]) {
     auto self_pose_sub = nh.subscribe<turtlesim::Pose>(
             nh.param<std::string>("name", "mpc_turtle") + "/pose", 1,
             [&loc = env.self](const turtlesim::PoseConstPtr &pose) {
-                return save_pose(loc, pose);
+                loc = *pose;
             }
     );
 
     auto other_pose_sub = nh.subscribe<turtlesim::Pose>(
             nh.param<std::string>("other_name", "turtle1") + "/pose", 1,
             [&loc = env.other](const turtlesim::PoseConstPtr &pose) {
-                return save_pose(loc, pose);
+                loc = *pose;
             }
     );
 
@@ -75,7 +71,7 @@ int main(int argc, char *argv[]) {
                  env.other.x, env.other.y, goal.x, goal.y}
         );
 
-        ROS_INFO("===> Contorls: (%f, %f) ", inputs.a, inputs.alpha_dot);
+        ROS_INFO("===> Controls: (%f, %f) ", inputs.a, inputs.alpha_dot);
 
 
         // Assume Rear wheel drive
